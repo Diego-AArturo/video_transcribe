@@ -7,14 +7,13 @@ app = Flask(__name__)
 
 @app.route('/', methods=['GET'])
 def inicio():
-    return 'InsectID'
+    return 'video2text'
 
 @app.route('/video2text', methods=['POST'])
 def enviar_url():
-    url = request.form.get('url')
+    url = request.json.get('url', None)
     if not url:
-        return jsonify({"error": "No URL found in the request"}), 400
-
+        return jsonify({"error": "No URL found in the request"}), 400 
     try:
         result = process_video(url)
         if not result:

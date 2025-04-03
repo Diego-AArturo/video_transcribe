@@ -17,16 +17,34 @@ def split_video(video_path, chunk_duration=CHUNK_DURATION):
 
     try:
         result = subprocess.run(
-            ["ffmpeg", "-i", str(video_path), "-c", "copy", "-map", "0", "-segment_time", str(chunk_duration),
-             "-f", "segment", "-reset_timestamps", "1", output_pattern],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True
+            [
+                "ffmpeg",
+                "-analyzeduration", "2147483647",  # mayor análisis para detectar parámetros
+                "-probesize", "2147483647",
+                "-i", str(video_path),
+                "-c", "copy",
+                "-map", "0",
+                "-segment_time", str(chunk_duration),
+                "-f", "segment",
+                "-reset_timestamps", "1",
+                output_pattern
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            text=True
         )
         logging.info(result.stdout)
+        logging.debug(result.stderr)
     except subprocess.CalledProcessError as e:
         logging.error(f"Error during video splitting: {e.stderr}")
         return []
 
-    return sorted(Path().glob("chunk_*.mp4"))
+    chunks = sorted(Path().glob("chunk_*.mp4"))
+    if not chunks:
+        logging.error("No video chunks were created after splitting.")
+    return chunks
+
 
 def process_video(video_url,ai=False):
     path_video = Path("video.mp4")
@@ -88,6 +106,11 @@ def process_video(video_url,ai=False):
                 temp_file.unlink(missing_ok=True)
             except Exception as e:
                 logging.warning(f"Could not delete {temp_file}: {e}")
+        
+        if path_video.exists():
+            path_video.unlink(missing_ok=True)        
+        if path_json.exists():
+            path_json.unlink(missing_ok=True)
 
         return combined_data
 
@@ -100,9 +123,3 @@ def process_video(video_url,ai=False):
 
 
 
-
-# h = process_video('https://artiefy-upload.s3.us-east-2.amazonaws.com/uploads/ee9fb9aa-a3ad-4e4e-b952-eab0c5da84ed')
-# print('h:', h)
-#https://artiefy-upload.s3.us-east-2.amazonaws.com/uploads/a4d18e42-444a-4016-80db-fb7a5059a37f-Video de WhatsApp 2025-01-08 a las 18.29.40_c52811e4.mp4
-# hola, de que trata este video ? https://www.youtube.com/watch?v=3lnp6mdIf_o
-# video_processing('https://www.youtube.com/watch?v=3lnp6mdIf_o')
