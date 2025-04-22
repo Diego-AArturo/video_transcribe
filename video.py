@@ -1,9 +1,14 @@
+#video.py
 import subprocess
 import os
 import logging
 import json
 from pathlib import Path
 from audio_writer import audio2json, video2audio
+import requests
+from urllib.parse import urlparse
+import uuid
+
 
 # Configuración de logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -45,21 +50,35 @@ def split_video(video_path, chunk_duration=CHUNK_DURATION):
         logging.error("No video chunks were created after splitting.")
     return chunks
 
+def download_from_s3_streaming(url, chunk_size=8192, output_path="video.mp4"):
+    """
+    Descarga un archivo desde S3 en modo streaming sin cargarlo completamente en memoria.
+    """
+    response = requests.get(url, stream=True)
+    if response.status_code != 200:
+        raise Exception(f"Error descargando video: {response.status_code}")
+
+    with open(output_path, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=chunk_size):
+            if chunk:
+                f.write(chunk)
+
+    return output_path
 
 def process_video(video_url,ai=False):
-    path_video = Path("video.mp4")
+    unique_id = uuid.uuid4().hex[:8]
+    path_video = Path(f"video_{unique_id}.mp4")
+    
     if not path_video.exists():
-        path_video = Path("video.mp4.webm")
-    path_json = Path("video.json")
+        path_video = Path(f"video_{unique_id}.mp4.webm")
+    path_json = Path(f"video_{unique_id}.json")
+    
     temp_files = []  # Para manejar la limpieza de archivos al final
 
     try:
         logging.info(f"Downloading video from: {video_url}")
-        result = subprocess.run(
-            ["yt-dlp", "-o", str(path_video), video_url],
-            capture_output=True, text=True, check=True
-        )
-        logging.info(result.stdout)
+        result = download_from_s3_streaming(video_url, output_path=str(path_video))
+        logging.info(result)
 
         if not path_video.exists() or path_video.stat().st_size == 0:
             logging.error("Downloaded video file is missing or empty.")
