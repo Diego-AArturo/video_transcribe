@@ -21,7 +21,7 @@ def enviar_url():
         return jsonify({"error": "No URL found in the request"}), 400 
     try:
         task_id = uuid.uuid4().hex
-        job = task_queue.enqueue(process_video, url, job_id=task_id)
+        job = task_queue.enqueue(process_video, url, job_id=task_id,job_timeout=14400)
 
         return jsonify({"message": "Video processing started", "task_id": job.id}), 202
     except Exception as e:
