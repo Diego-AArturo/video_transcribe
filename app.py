@@ -19,28 +19,24 @@ def enviar_url():
     url = request.json.get('url', None)
     if not url:
         return jsonify({"error": "No URL found in the request"}), 400 
+
     try:
         task_id = uuid.uuid4().hex
-        job = task_queue.enqueue(process_video, url, job_id=task_id,job_timeout=14400)
+        job = task_queue.enqueue(process_video, url, job_id=task_id, timeout=3600)
 
-        return jsonify({"message": "Video processing started", "task_id": job.id}), 202
+        # Esperar hasta 1 hora por la finalización del trabajo
+        result = job.wait(timeout=3600)
+
+        if job.is_failed:
+            return jsonify({"error": "Job failed", "details": str(job.exc_info)}), 500
+
+        return jsonify(result), 200
+
     except Exception as e:
         return jsonify({"error": "An error occurred while processing the video", "details": str(e)}), 500
-
     
 
-@app.route('/status/<task_id>')
-def check_status(task_id):
-    job = task_queue.fetch_job(task_id)
-    if job is None:
-        return jsonify({"error": "Job not found"}), 404
 
-    if job.is_finished:
-        return jsonify({"status": "finished", "result": job.result})
-    elif job.is_failed:
-        return jsonify({"status": "failed", "error": str(job.exc_info)})
-    else:
-        return jsonify({"status": job.get_status()})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
