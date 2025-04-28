@@ -1,42 +1,51 @@
-#app.py
-from flask import Flask, request, jsonify
-import json
-from rq import Queue
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 import redis
+from rq import Queue
 import uuid
+import asyncio
 from video import process_video
 
-app = Flask(__name__)
-redis_conn = redis.Redis(host='redis', port=6379)
+app = FastAPI()
+
+# Configurar Redis y RQ
+redis_conn = redis.Redis(host="redis", port=6379)
 task_queue = Queue(connection=redis_conn)
 
-@app.route('/', methods=['GET'])
-def inicio():
-    return 'video2text'
+class VideoRequest(BaseModel):
+    url: str
 
-@app.route('/video2text', methods=['POST'])
-def enviar_url():
-    url = request.json.get('url', None)
+@app.post("/video2text")
+async def enviar_url(request: VideoRequest):
+    url = request.url
     if not url:
-        return jsonify({"error": "No URL found in the request"}), 400 
-
+        raise HTTPException(status_code=400, detail="No URL found in the request")
+    
     try:
         task_id = uuid.uuid4().hex
         job = task_queue.enqueue(process_video, url, job_id=task_id, timeout=3600)
 
-        # Esperar hasta 1 hora por la finalización del trabajo
-        result = job.wait(timeout=3600)
+        timeout_seconds = 3600  # 1 hora máximo
+        poll_interval = 10       # esperar 5 segundos entre chequeos
 
-        if job.is_failed:
-            return jsonify({"error": "Job failed", "details": str(job.exc_info)}), 500
+        elapsed = 0
+        while elapsed < timeout_seconds:
+            job.refresh()
 
-        return jsonify(result), 200
+            if job.is_finished:
+                return job.result
+            if job.is_failed:
+                raise HTTPException(status_code=500, detail=f"Job failed: {job.exc_info}")
+
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
+
+        raise HTTPException(status_code=504, detail="Timeout: job did not complete in time")
 
     except Exception as e:
-        return jsonify({"error": "An error occurred while processing the video", "details": str(e)}), 500
-    
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
+@app.get("/")
+def inicio():
+    return {"message": "video2text API"}
 
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0')
