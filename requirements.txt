@@ -1,5 +1,6 @@
 fastapi
 moviepy==2.1.2
+uvicorn
 yt-dlp==2025.2.19
 requests==2.32.3
 tqdm==4.67.1
