@@ -23,7 +23,7 @@ async def enviar_url(request: VideoRequest):
     
     try:
         task_id = uuid.uuid4().hex
-        job = task_queue.enqueue(process_video, url, job_id=task_id, timeout=3600)
+        job = task_queue.enqueue(process_video, url, job_id=task_id, job_timeout=3600)
 
         timeout_seconds = 3600  # 1 hora máximo
         poll_interval = 10       # esperar 5 segundos entre chequeos
