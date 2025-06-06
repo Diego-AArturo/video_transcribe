@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import redis
 from rq import Queue
+import logging
+import json
 import uuid
 import asyncio
 from video import process_video
@@ -23,14 +25,19 @@ async def enviar_url(request: VideoRequest):
     
     try:
         task_id = uuid.uuid4().hex
-        job = task_queue.enqueue(process_video, url, job_id=task_id, job_timeout=3600)
+        job = task_queue.enqueue(process_video, url, job_id=task_id, job_timeout=6000)
 
-        timeout_seconds = 3600  # 1 hora máximo
-        poll_interval = 10       # esperar 5 segundos entre chequeos
+        timeout_seconds = 6000  # 1 hora máximo
+        poll_interval = 5       # esperar 5 segundos entre chequeos
 
         elapsed = 0
         while elapsed < timeout_seconds:
             job.refresh()
+            try:
+                json.dumps(job.result)
+            except Exception as e:
+                logging.error(f"El resultado del job no es JSON serializable: {e}")
+                raise HTTPException(status_code=500, detail="Job result is not valid JSON")
 
             if job.is_finished:
                 return job.result
