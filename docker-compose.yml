@@ -1,8 +1,6 @@
 services:
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: diegoarturo/video_transcribe:latest
     container_name: video_transcribe_api
     ports:
       - "8000:8000"
@@ -26,13 +24,13 @@ services:
     restart: unless-stopped
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: diegoarturo/video_transcribe:latest
     container_name: rq_worker
     depends_on:
       - redis
     command: python worker.py
+    volumes:
+      - ./worker.py:/app/worker.py  
     restart: unless-stopped
 
 
